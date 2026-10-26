@@ -6,19 +6,38 @@ import {
   readVaultBlob,
   writeVaultBlob,
 } from '../lib/vaultStorage'
+import { deleteRemoteVault, fetchRemoteVault, pushRemoteVault } from '../lib/vaultRemote'
+import { useAuthStore } from './authStore'
 import { useEditorStore } from './editorStore'
 import { useRepoStore } from './repoStore'
+import { useStatusStore } from './statusStore'
 import { migrateSettings } from '../types'
-import type { AppSettings, RepoRef } from '../types'
+import type { AppSettings, EncryptedBlob, RepoRef } from '../types'
 
 export type VaultStatus = 'checking' | 'no-vault' | 'locked' | 'unlocked'
+
+function activeUid(): string | null {
+  return useAuthStore.getState().user?.uid ?? null
+}
+
+/** Fire-and-forget push to Firestore — never blocks or fails the local save. */
+function syncToCloud(blob: EncryptedBlob) {
+  const uid = activeUid()
+  if (!uid) return
+  pushRemoteVault(uid, blob)
+    .then(() => useStatusStore.getState().setSuccess('Synced settings to cloud'))
+    .catch((err) => {
+      const message = err instanceof Error ? err.message : 'Cloud sync failed'
+      useStatusStore.getState().setError(`Cloud sync failed: ${message}`)
+    })
+}
 
 interface VaultState {
   status: VaultStatus
   settings: AppSettings | null
   passphrase: string | null
   error: string | null
-  init: () => void
+  init: () => Promise<void>
   setupVault: (passphrase: string, settings: AppSettings) => Promise<void>
   unlock: (passphrase: string) => Promise<void>
   updateSettings: (settings: AppSettings) => Promise<void>
@@ -35,13 +54,26 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   passphrase: null,
   error: null,
 
-  init: () => {
-    set({ status: hasStoredVault() ? 'locked' : 'no-vault', error: null })
+  init: async () => {
+    set({ status: 'checking', error: null })
+    const uid = activeUid()
+    if (uid) {
+      try {
+        const remote = await fetchRemoteVault(uid)
+        // Cloud is the cross-device source of truth once signed in: pull it down so this
+        // browser's cache matches it before deciding no-vault vs. locked.
+        if (remote) writeVaultBlob(remote)
+      } catch {
+        // Offline or no permission yet — fall back to whatever's cached locally.
+      }
+    }
+    set({ status: hasStoredVault() ? 'locked' : 'no-vault' })
   },
 
   setupVault: async (passphrase, settings) => {
     const blob = await encryptJSON(settings, passphrase)
     writeVaultBlob(blob)
+    syncToCloud(blob)
     set({ status: 'unlocked', settings, passphrase, error: null })
   },
 
@@ -65,6 +97,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     if (!passphrase) throw new Error('Vault is locked')
     const blob = await encryptJSON(settings, passphrase)
     writeVaultBlob(blob)
+    syncToCloud(blob)
     set({ settings })
   },
 
@@ -109,9 +142,11 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     set({ status: 'locked', settings: null, passphrase: null, error: null })
   },
 
-  /** Wipes the encrypted vault from this browser entirely (GitHub token, repos, everything). */
+  /** Wipes the encrypted vault everywhere: this browser's cache and the cloud copy. */
   logout: () => {
     clearVault()
+    const uid = activeUid()
+    if (uid) void deleteRemoteVault(uid)
     useRepoStore.getState().reset()
     useEditorStore.getState().reset()
     set({ status: 'no-vault', settings: null, passphrase: null, error: null })
