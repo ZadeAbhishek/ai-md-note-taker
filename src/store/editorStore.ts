@@ -36,7 +36,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
       try {
         const { content, sha } = await getFileContent(token, repo, path)
         set({
-          openFile: { path, content, sha, dirty: false },
+          openFile: { path, content, savedContent: content, sha, dirty: false },
           loading: false,
         })
         status().setSuccess(`Opened ${path}`)
@@ -50,12 +50,21 @@ export const useEditorStore = create<EditorState>((set, get) => {
     setContent: (content) => {
       const { openFile } = get()
       if (!openFile) return
-      set({ openFile: { ...openFile, content, dirty: true } })
+      // Real-diff check, not just "something fired an onChange": typing then undoing back to
+      // the saved text must not look dirty, or auto-save could be scheduled for nothing.
+      set({ openFile: { ...openFile, content, dirty: content !== openFile.savedContent } })
     },
 
+    // Critical invariant: never commits when there is no actual content difference from what's
+    // already saved on GitHub — guarded here centrally so it holds for every caller (the Save
+    // button and the 10s auto-save timer alike), not just whichever one remembers to check.
     save: async (token, repo) => {
       const { openFile } = get()
       if (!openFile) return
+      if (openFile.content === openFile.savedContent) {
+        set({ openFile: { ...openFile, dirty: false } })
+        return
+      }
       set({ saving: true, error: null })
       status().setLoading(`Saving ${openFile.path}…`)
       try {
@@ -67,7 +76,10 @@ export const useEditorStore = create<EditorState>((set, get) => {
           openFile.sha,
           `Update ${openFile.path}`,
         )
-        set({ openFile: { ...openFile, sha, dirty: false }, saving: false })
+        set({
+          openFile: { ...openFile, sha, savedContent: openFile.content, dirty: false },
+          saving: false,
+        })
         status().setSuccess(`Saved ${openFile.path}`)
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to save file'

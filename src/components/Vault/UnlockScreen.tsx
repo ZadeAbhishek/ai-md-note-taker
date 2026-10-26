@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { useVaultStore } from '../../store/vaultStore'
+import {
+  DEFAULT_AUTO_SAVE_DELAY_SECONDS,
+  DEFAULT_AUTO_SYNC_INTERVAL_SECONDS,
+} from '../../types'
 
 const inputClass =
   'rounded border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-purple-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100'
@@ -78,6 +82,8 @@ function SetupForm() {
         void setupVault(passphrase, {
           githubToken,
           repo: owner && name ? { owner, name, branch: branch || 'main' } : null,
+          autoSaveDelaySeconds: DEFAULT_AUTO_SAVE_DELAY_SECONDS,
+          autoSyncIntervalSeconds: DEFAULT_AUTO_SYNC_INTERVAL_SECONDS,
         })
       }}
     >

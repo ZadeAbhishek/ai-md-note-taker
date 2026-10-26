@@ -62,6 +62,19 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
     }
   }, [settings?.githubToken, settings?.repo, sync])
 
+  // Periodic background refresh, opt-in via Settings (0 = off). Independent of the editor,
+  // so it never touches an in-progress edit — it only re-fetches the sidebar's file list.
+  useEffect(() => {
+    const intervalSeconds = settings?.autoSyncIntervalSeconds ?? 0
+    if (!settings?.githubToken || !settings.repo || intervalSeconds <= 0) return
+    const token = settings.githubToken
+    const repo = settings.repo
+    const id = setInterval(() => {
+      void sync(token, repo)
+    }, intervalSeconds * 1000)
+    return () => clearInterval(id)
+  }, [settings?.githubToken, settings?.repo, settings?.autoSyncIntervalSeconds, sync])
+
   useEffect(() => {
     function onMouseMove(e: MouseEvent) {
       if (!isResizing.current) return
@@ -244,13 +257,14 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
           <button
             title="Refresh"
             className={iconButtonClass}
+            disabled={loading}
             onClick={() => {
               if (settings?.githubToken && settings.repo) {
                 void sync(settings.githubToken, settings.repo)
               }
             }}
           >
-            ⟳
+            <span className={loading ? 'inline-block animate-spin' : 'inline-block'}>⟳</span>
           </button>
           <button title="Settings" className={iconButtonClass} onClick={onOpenSettings}>
             ⚙
@@ -312,9 +326,10 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
             Open Settings to connect a GitHub repo.
           </p>
         )}
-        {loading && <p className="px-3 py-2 text-xs text-neutral-500">Syncing…</p>}
         {error && <p className="px-3 py-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
-        {!loading && !error && settings?.repo && (
+        {/* Stays mounted through loading/sync so each folder's local expand/collapse state
+            (and any in-progress rename/add forms) survives a refresh instead of resetting. */}
+        {settings?.repo && (
           <FileTree
             nodes={tree}
             activePath={activePath}

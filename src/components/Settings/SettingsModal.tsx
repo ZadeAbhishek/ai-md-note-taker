@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { useVaultStore } from '../../store/vaultStore'
+import {
+  DEFAULT_AUTO_SAVE_DELAY_SECONDS,
+  DEFAULT_AUTO_SYNC_INTERVAL_SECONDS,
+} from '../../types'
 
 interface Props {
   onClose: () => void
@@ -16,16 +20,27 @@ export function SettingsModal({ onClose }: Props) {
   const [owner, setOwner] = useState(settings?.repo?.owner ?? '')
   const [name, setName] = useState(settings?.repo?.name ?? '')
   const [branch, setBranch] = useState(settings?.repo?.branch ?? 'main')
+  const [autoSaveDelay, setAutoSaveDelay] = useState(
+    String(settings?.autoSaveDelaySeconds ?? DEFAULT_AUTO_SAVE_DELAY_SECONDS),
+  )
+  const [autoSyncInterval, setAutoSyncInterval] = useState(
+    String(settings?.autoSyncIntervalSeconds ?? DEFAULT_AUTO_SYNC_INTERVAL_SECONDS),
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSave() {
+    const parsedAutoSave = Math.max(2, Math.round(Number(autoSaveDelay) || DEFAULT_AUTO_SAVE_DELAY_SECONDS))
+    const parsedAutoSync = Math.max(0, Math.round(Number(autoSyncInterval) || 0))
+
     setSaving(true)
     setError(null)
     try {
       await updateSettings({
         githubToken,
         repo: owner && name ? { owner, name, branch: branch || 'main' } : null,
+        autoSaveDelaySeconds: parsedAutoSave,
+        autoSyncIntervalSeconds: parsedAutoSync,
       })
       onClose()
     } catch (err) {
@@ -63,6 +78,38 @@ export function SettingsModal({ onClose }: Props) {
               <input className={inputClass} value={branch} onChange={(e) => setBranch(e.target.value)} />
             </label>
           </div>
+
+          <hr className="border-neutral-200 dark:border-neutral-800" />
+
+          <div className="flex gap-2">
+            <label className="w-1/2 text-xs text-neutral-600 dark:text-neutral-400">
+              Auto-save delay (seconds)
+              <input
+                type="number"
+                min={2}
+                max={300}
+                className={inputClass}
+                value={autoSaveDelay}
+                onChange={(e) => setAutoSaveDelay(e.target.value)}
+              />
+            </label>
+            <label className="w-1/2 text-xs text-neutral-600 dark:text-neutral-400">
+              Auto-refresh interval (seconds, 0 = off)
+              <input
+                type="number"
+                min={0}
+                max={3600}
+                className={inputClass}
+                value={autoSyncInterval}
+                onChange={(e) => setAutoSyncInterval(e.target.value)}
+              />
+            </label>
+          </div>
+          <p className="text-xs text-neutral-500">
+            Auto-save delay is how long after you stop typing before an edit commits on its own.
+            Auto-refresh periodically re-syncs the file list in the background; 0 disables it (you
+            can still sync manually with ⟳).
+          </p>
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}

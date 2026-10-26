@@ -86,6 +86,7 @@ function FileTreeNode({
   const [newFileName, setNewFileName] = useState('')
   const [newFolderFileName, setNewFolderFileName] = useState('README.md')
   const [dragOver, setDragOver] = useState(false)
+  const [expanded, setExpanded] = useState(true)
 
   function cancelRename() {
     setRenaming(false)
@@ -199,7 +200,12 @@ function FileTreeNode({
     const isActive = node.path === activePath
     return (
       <li>
-        <div className="flex items-center gap-1 px-3 py-1.5" style={indent}>
+        <div
+          className={`group flex items-center gap-1 px-3 py-1.5 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-900 ${
+            isActive ? 'bg-neutral-100 dark:bg-neutral-900' : ''
+          }`}
+          style={indent}
+        >
           {renaming ? (
             renameRow
           ) : (
@@ -263,7 +269,6 @@ function FileTreeNode({
 
   return (
     <li
-      className={dragOver ? 'rounded bg-neutral-200/60 dark:bg-neutral-800/60' : undefined}
       onDragOver={(e) => {
         e.preventDefault()
         e.stopPropagation()
@@ -278,18 +283,32 @@ function FileTreeNode({
         if (draggedPath) void onMove(draggedPath, node.path)
       }}
     >
-      <div className="flex items-center justify-between gap-1 px-3 py-1.5" style={indent}>
+      <div
+        className={`group flex items-center justify-between gap-1 px-3 py-1.5 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-900 ${
+          dragOver ? 'bg-neutral-200 dark:bg-neutral-800' : ''
+        }`}
+        style={indent}
+      >
         {renaming ? (
           renameRow
         ) : (
           <>
+            <button
+              title={expanded ? 'Collapse folder' : 'Expand folder'}
+              className="shrink-0 rounded text-neutral-500 transition-transform duration-200 ease-out hover:bg-neutral-200 hover:text-neutral-900 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+              style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+              onClick={() => setExpanded((v) => !v)}
+            >
+              ▸
+            </button>
             <span
               draggable
               onDragStart={(e) => {
                 e.dataTransfer.setData('text/plain', node.path)
                 e.dataTransfer.effectAllowed = 'move'
               }}
-              className="min-w-0 flex-1 truncate text-xs font-medium uppercase tracking-wide text-neutral-600 dark:text-neutral-500"
+              onClick={() => setExpanded((v) => !v)}
+              className="min-w-0 flex-1 cursor-pointer truncate text-xs font-medium uppercase tracking-wide text-neutral-600 hover:text-neutral-900 dark:text-neutral-500 dark:hover:text-neutral-200"
             >
               {node.name}
             </span>
@@ -437,22 +456,27 @@ function FileTreeNode({
         </p>
       )}
 
-      <ul>
-        {node.children?.map((child) => (
-          <FileTreeNode
-            key={child.path}
-            node={child}
-            activePath={activePath}
-            depth={depth + 1}
-            onSelect={onSelect}
-            onCreateFile={onCreateFile}
-            onCreateFolder={onCreateFolder}
-            onRename={onRename}
-            onDeletePath={onDeletePath}
-            onMove={onMove}
-          />
-        ))}
-      </ul>
+      <div
+        className="grid transition-[grid-template-rows] duration-200 ease-in-out"
+        style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+      >
+        <ul className="overflow-hidden">
+          {node.children?.map((child) => (
+            <FileTreeNode
+              key={child.path}
+              node={child}
+              activePath={activePath}
+              depth={depth + 1}
+              onSelect={onSelect}
+              onCreateFile={onCreateFile}
+              onCreateFolder={onCreateFolder}
+              onRename={onRename}
+              onDeletePath={onDeletePath}
+              onMove={onMove}
+            />
+          ))}
+        </ul>
+      </div>
     </li>
   )
 }

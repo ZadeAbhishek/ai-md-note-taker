@@ -6,10 +6,19 @@ function client(token: string): Octokit {
 }
 
 /**
- * Fetches the full recursive tree and returns only .md files, nested into a folder tree.
- * Passing the branch name directly as `tree_sha` resolves to its latest commit's tree,
- * so this is a single round trip instead of resolving the branch sha first.
+ * Every param not consumed by a GET endpoint's URL template is appended as a query string
+ * param (see @octokit/endpoint's `parse.js`), so a plain `{owner, repo, tree_sha: branch}`
+ * request hits the exact same URL on every call. That makes it a prime target for any GET
+ * cache in the chain (the browser's HTTP cache in particular) to serve a stale snapshot
+ * instead of hitting the network — which is what was making sync (and anything that reads
+ * the tree first, like rename/move/delete) intermittently show stale data. Spreading this
+ * into a request guarantees a unique URL every time, so nothing can cache-hit it.
  */
+function noCache() {
+  return { _: Date.now() }
+}
+
+/** Fetches the full recursive tree and returns only .md files, nested into a folder tree. */
 export async function listMarkdownFiles(
   token: string,
   repo: RepoRef,
@@ -20,6 +29,7 @@ export async function listMarkdownFiles(
     repo: repo.name,
     tree_sha: repo.branch,
     recursive: 'true',
+    ...noCache(),
   })
 
   const mdPaths = (tree.tree ?? [])
@@ -70,6 +80,7 @@ export async function getFileContent(
     repo: repo.name,
     path,
     ref: repo.branch,
+    ...noCache(),
   })
 
   if (Array.isArray(data) || data.type !== 'file' || !data.content) {
@@ -152,9 +163,9 @@ type MatchedBlob = { path: string; sha: string; mode: string; type: string }
 
 /**
  * Loads the branch tip commit sha + its full recursive blob listing, for building a new
- * tree from. The ref lookup and the tree fetch don't depend on each other (the tree fetch
- * resolves the branch name to its tree directly), so they run in parallel, and we skip the
- * separate "get commit" round trip entirely.
+ * tree from. The ref lookup and the tree fetch don't depend on each other, so they run in
+ * parallel; both are cache-busted (see `noCache`) so this always reflects the true latest
+ * state before rename/move/delete build a new tree from it.
  */
 async function getBaseTree(
   octokit: Octokit,
@@ -165,17 +176,16 @@ async function getBaseTree(
       owner: repo.owner,
       repo: repo.name,
       ref: `heads/${repo.branch}`,
+      ...noCache(),
     }),
     octokit.git.getTree({
       owner: repo.owner,
       repo: repo.name,
       tree_sha: repo.branch,
       recursive: 'true',
+      ...noCache(),
     }),
   ])
-
-  const latestCommitSha = ref.object.sha
-  const baseTreeSha = tree.sha
 
   const entries = (tree.tree ?? []).filter(
     (entry): entry is MatchedBlob =>
@@ -184,7 +194,7 @@ async function getBaseTree(
       typeof entry.sha === 'string',
   )
 
-  return { latestCommitSha, baseTreeSha, entries }
+  return { latestCommitSha: ref.object.sha, baseTreeSha: tree.sha, entries }
 }
 
 function blobsUnder(entries: MatchedBlob[], targetPath: string): MatchedBlob[] {
