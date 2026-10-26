@@ -42,7 +42,7 @@ function App() {
   return (
     <div className="flex h-screen flex-col bg-white text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
       <header className="flex items-center justify-between border-b border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
-        <span className="text-sm font-semibold">MD Note Taker</span>
+        <span className="text-sm font-semibold">VIBE MD</span>
         <div className="flex items-center gap-1">
           <button
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}

@@ -1,32 +1,29 @@
-# React + TypeScript + Vite
+# VIBE MD
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A single-user, no-backend markdown note-taker that syncs directly with a GitHub repo.
 
-Currently, two official plugins are available:
+- Edit `.md` files with a formatting toolbar (headings, bold/italic, lists, links, code
+  blocks) or switch to a live rendered preview.
+- Saves commit straight to GitHub; edits also auto-save after a configurable idle delay.
+- Create, rename, move (drag-and-drop), and delete files and folders — each a single atomic
+  commit via the Git Data API.
+- GitHub token and repo settings are encrypted in the browser with a passphrase (Web Crypto,
+  AES-GCM) and never leave your machine.
+- Light/dark theme, resizable/collapsible sidebar, optional periodic background refresh.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Getting started
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+On first run you'll set a local passphrase, then provide a GitHub Personal Access Token and
+the owner/repo/branch to sync with.
+
+## Scripts
+
+- `npm run dev` — start the Vite dev server
+- `npm run build` — type-check and build for production
+- `npm run lint` — run Oxlint
+- `npm run preview` — preview the production build locally

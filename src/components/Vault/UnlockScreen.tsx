@@ -13,7 +13,7 @@ export function UnlockScreen() {
   return (
     <div className="flex h-full items-center justify-center bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
       <div className="w-full max-w-md rounded-lg border border-neutral-200 bg-neutral-50 p-6 dark:border-neutral-800 dark:bg-neutral-900">
-        <h1 className="mb-1 text-lg font-semibold">MD Note Taker</h1>
+        <h1 className="mb-1 text-lg font-semibold">VIBE MD</h1>
         {status === 'no-vault' ? <SetupForm /> : <UnlockForm />}
       </div>
     </div>
