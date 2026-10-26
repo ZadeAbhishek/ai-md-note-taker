@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useEditorStore } from '../../store/editorStore'
 import { useRepoStore } from '../../store/repoStore'
 import { useVaultStore } from '../../store/vaultStore'
+import { getActiveRepo } from '../../types'
 import { FileTree } from './FileTree'
 
 interface Props {
@@ -41,6 +42,8 @@ const formInputClass =
 
 export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
   const settings = useVaultStore((s) => s.settings)
+  const setActiveWorkspace = useVaultStore((s) => s.setActiveWorkspace)
+  const repo = getActiveRepo(settings)
   const { tree, loading, error, sync, createFile, renamePath, deletePath } = useRepoStore()
   const openFile = useEditorStore((s) => s.openFile)
   const openPath = useEditorStore((s) => s.openPath)
@@ -57,23 +60,22 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
   const [createError, setCreateError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (settings?.githubToken && settings.repo) {
-      void sync(settings.githubToken, settings.repo)
+    if (settings?.githubToken && repo) {
+      void sync(settings.githubToken, repo)
     }
-  }, [settings?.githubToken, settings?.repo, sync])
+  }, [settings?.githubToken, repo, sync])
 
   // Periodic background refresh, opt-in via Settings (0 = off). Independent of the editor,
   // so it never touches an in-progress edit — it only re-fetches the sidebar's file list.
   useEffect(() => {
     const intervalSeconds = settings?.autoSyncIntervalSeconds ?? 0
-    if (!settings?.githubToken || !settings.repo || intervalSeconds <= 0) return
+    if (!settings?.githubToken || !repo || intervalSeconds <= 0) return
     const token = settings.githubToken
-    const repo = settings.repo
     const id = setInterval(() => {
       void sync(token, repo)
     }, intervalSeconds * 1000)
     return () => clearInterval(id)
-  }, [settings?.githubToken, settings?.repo, settings?.autoSyncIntervalSeconds, sync])
+  }, [settings?.githubToken, repo, settings?.autoSyncIntervalSeconds, sync])
 
   useEffect(() => {
     function onMouseMove(e: MouseEvent) {
@@ -102,9 +104,8 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
 
   async function handleCreateSubmit() {
     const name = newName.trim()
-    if (!settings?.githubToken || !settings.repo || !name || !createMode) return
+    if (!settings?.githubToken || !repo || !name || !createMode) return
     const token = settings.githubToken
-    const repo = settings.repo
 
     let path: string
     let content: string
@@ -133,12 +134,12 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
   }
 
   async function handleCreateFileInFolder(folderPath: string, fileName: string) {
-    if (!settings?.githubToken || !settings.repo) throw new Error('No repo configured')
+    if (!settings?.githubToken || !repo) throw new Error('No repo configured')
     const name = toMarkdownFileName(fileName)
     const path = `${folderPath}/${name}`
     const content = `# ${name.replace(/\.md$/i, '')}\n`
-    await createFile(settings.githubToken, settings.repo, path, content)
-    void openPath(settings.githubToken, settings.repo, path)
+    await createFile(settings.githubToken, repo, path, content)
+    void openPath(settings.githubToken, repo, path)
   }
 
   async function handleCreateFolderInFolder(
@@ -146,51 +147,51 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
     folderName: string,
     fileName: string,
   ) {
-    if (!settings?.githubToken || !settings.repo) throw new Error('No repo configured')
+    if (!settings?.githubToken || !repo) throw new Error('No repo configured')
     const subFolder = folderName.trim().replace(/^\/+|\/+$/g, '')
     const name = toMarkdownFileName(fileName)
     const path = `${parentPath}/${subFolder}/${name}`
     const content = `# ${name.replace(/\.md$/i, '')}\n`
-    await createFile(settings.githubToken, settings.repo, path, content)
-    void openPath(settings.githubToken, settings.repo, path)
+    await createFile(settings.githubToken, repo, path, content)
+    void openPath(settings.githubToken, repo, path)
   }
 
   /** If the currently open file was inside `oldPath`, follow it to its new location. */
   function reconcileOpenFileAfterMove(oldPath: string, newPath: string) {
-    if (!settings?.githubToken || !settings.repo || !openFile) return
+    if (!settings?.githubToken || !repo || !openFile) return
     if (openFile.path === oldPath || openFile.path.startsWith(`${oldPath}/`)) {
       const movedPath = `${newPath}${openFile.path.slice(oldPath.length)}`
-      void openPath(settings.githubToken, settings.repo, movedPath)
+      void openPath(settings.githubToken, repo, movedPath)
     }
   }
 
   async function handleRename(path: string, newName: string, isFile: boolean) {
-    if (!settings?.githubToken || !settings.repo) throw new Error('No repo configured')
+    if (!settings?.githubToken || !repo) throw new Error('No repo configured')
     const segments = path.split('/')
     let finalName = newName.trim()
     if (isFile) finalName = toMarkdownFileName(finalName)
     segments[segments.length - 1] = finalName
     const newPath = segments.join('/')
     if (newPath === path) return
-    await renamePath(settings.githubToken, settings.repo, path, newPath)
+    await renamePath(settings.githubToken, repo, path, newPath)
     reconcileOpenFileAfterMove(path, newPath)
   }
 
   async function handleMove(draggedPath: string, targetFolderPath: string) {
-    if (!settings?.githubToken || !settings.repo) throw new Error('No repo configured')
+    if (!settings?.githubToken || !repo) throw new Error('No repo configured')
     if (targetFolderPath === draggedPath || targetFolderPath.startsWith(`${draggedPath}/`)) {
       alert('Cannot move a folder into itself or one of its own subfolders.')
       return
     }
     const newPath = targetFolderPath ? `${targetFolderPath}/${basename(draggedPath)}` : basename(draggedPath)
     if (newPath === draggedPath) return
-    await renamePath(settings.githubToken, settings.repo, draggedPath, newPath)
+    await renamePath(settings.githubToken, repo, draggedPath, newPath)
     reconcileOpenFileAfterMove(draggedPath, newPath)
   }
 
   async function handleDeletePath(path: string, isFolder: boolean) {
-    if (!settings?.githubToken || !settings.repo) throw new Error('No repo configured')
-    await deletePath(settings.githubToken, settings.repo, path)
+    if (!settings?.githubToken || !repo) throw new Error('No repo configured')
+    await deletePath(settings.githubToken, repo, path)
     if (openFile && (openFile.path === path || (isFolder && openFile.path.startsWith(`${path}/`)))) {
       resetEditor()
     }
@@ -210,6 +211,8 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
     )
   }
 
+  const workspaces = settings?.workspaces ?? []
+
   return (
     <aside
       className="relative flex h-full shrink-0 flex-col border-r border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950"
@@ -224,15 +227,30 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
           >
             «
           </button>
-          <span className="truncate text-sm font-medium text-neutral-800 dark:text-neutral-200">
-            {settings?.repo ? `${settings.repo.owner}/${settings.repo.name}` : 'No repo set'}
-          </span>
+          {workspaces.length > 0 ? (
+            <select
+              title="Switch workspace"
+              className="min-w-0 flex-1 truncate rounded border-none bg-transparent text-sm font-medium text-neutral-800 outline-none dark:text-neutral-200"
+              value={settings?.activeWorkspaceId ?? ''}
+              onChange={(e) => void setActiveWorkspace(e.target.value)}
+            >
+              {workspaces.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.owner}/{w.name} ({w.branch})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="truncate text-sm font-medium text-neutral-800 dark:text-neutral-200">
+              No repo set
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <button
             title="New file"
             className={iconButtonClass}
-            disabled={!settings?.repo}
+            disabled={!repo}
             onClick={() => {
               setCreateMode((m) => (m === 'file' ? null : 'file'))
               setNewName('')
@@ -244,7 +262,7 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
           <button
             title="New folder"
             className={iconButtonClass}
-            disabled={!settings?.repo}
+            disabled={!repo}
             onClick={() => {
               setCreateMode((m) => (m === 'folder' ? null : 'folder'))
               setNewName('')
@@ -259,8 +277,8 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
             className={iconButtonClass}
             disabled={loading}
             onClick={() => {
-              if (settings?.githubToken && settings.repo) {
-                void sync(settings.githubToken, settings.repo)
+              if (settings?.githubToken && repo) {
+                void sync(settings.githubToken, repo)
               }
             }}
           >
@@ -321,15 +339,15 @@ export function Sidebar({ activePath, onSelect, onOpenSettings }: Props) {
       )}
 
       <div className="flex-1 overflow-y-auto py-2">
-        {!settings?.repo && (
+        {!repo && (
           <p className="px-3 py-2 text-xs text-neutral-500">
-            Open Settings to connect a GitHub repo.
+            Open Settings to add a GitHub repo.
           </p>
         )}
         {error && <p className="px-3 py-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
         {/* Stays mounted through loading/sync so each folder's local expand/collapse state
             (and any in-progress rename/add forms) survives a refresh instead of resetting. */}
-        {settings?.repo && (
+        {repo && (
           <FileTree
             nodes={tree}
             activePath={activePath}

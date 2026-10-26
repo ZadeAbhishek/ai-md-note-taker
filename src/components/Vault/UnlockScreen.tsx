@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { parseRepoInput } from '../../lib/githubUrl'
 import { useVaultStore } from '../../store/vaultStore'
 import {
   DEFAULT_AUTO_SAVE_DELAY_SECONDS,
   DEFAULT_AUTO_SYNC_INTERVAL_SECONDS,
 } from '../../types'
+import type { Workspace } from '../../types'
 
 const inputClass =
   'rounded border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-purple-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100'
@@ -60,9 +62,8 @@ function SetupForm() {
   const [passphrase, setPassphrase] = useState('')
   const [confirm, setConfirm] = useState('')
   const [githubToken, setGithubToken] = useState('')
-  const [owner, setOwner] = useState('')
-  const [name, setName] = useState('')
-  const [branch, setBranch] = useState('main')
+  const [repoInput, setRepoInput] = useState('')
+  const [branch, setBranch] = useState('')
   const [validationError, setValidationError] = useState<string | null>(null)
 
   return (
@@ -78,10 +79,29 @@ function SetupForm() {
           setValidationError('Passphrases do not match.')
           return
         }
+
+        let workspaces: Workspace[] = []
+        if (repoInput.trim()) {
+          const parsed = parseRepoInput(repoInput)
+          if (!parsed) {
+            setValidationError('Could not parse that as a GitHub repo URL or "owner/repo".')
+            return
+          }
+          workspaces = [
+            {
+              id: crypto.randomUUID(),
+              owner: parsed.owner,
+              name: parsed.name,
+              branch: branch.trim() || parsed.branch || 'main',
+            },
+          ]
+        }
+
         setValidationError(null)
         void setupVault(passphrase, {
           githubToken,
-          repo: owner && name ? { owner, name, branch: branch || 'main' } : null,
+          workspaces,
+          activeWorkspaceId: workspaces[0]?.id ?? null,
           autoSaveDelaySeconds: DEFAULT_AUTO_SAVE_DELAY_SECONDS,
           autoSyncIntervalSeconds: DEFAULT_AUTO_SYNC_INTERVAL_SECONDS,
         })
@@ -118,19 +138,13 @@ function SetupForm() {
 
       <div className="flex gap-2">
         <input
-          className={`w-1/3 ${inputClass}`}
-          placeholder="owner"
-          value={owner}
-          onChange={(e) => setOwner(e.target.value)}
+          className={`flex-1 ${inputClass}`}
+          placeholder="Paste a GitHub repo URL (or owner/repo) — optional, add later in Settings"
+          value={repoInput}
+          onChange={(e) => setRepoInput(e.target.value)}
         />
         <input
-          className={`w-1/3 ${inputClass}`}
-          placeholder="repo"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <input
-          className={`w-1/3 ${inputClass}`}
+          className={`w-24 ${inputClass}`}
           placeholder="branch"
           value={branch}
           onChange={(e) => setBranch(e.target.value)}

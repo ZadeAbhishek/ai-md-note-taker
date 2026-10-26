@@ -1,12 +1,13 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '../../store/editorStore'
 import { useVaultStore } from '../../store/vaultStore'
-import { DEFAULT_AUTO_SAVE_DELAY_SECONDS } from '../../types'
+import { DEFAULT_AUTO_SAVE_DELAY_SECONDS, getActiveRepo } from '../../types'
 import { MarkdownEditor } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
 
 export function EditorPane() {
   const settings = useVaultStore((s) => s.settings)
+  const repo = getActiveRepo(settings)
   const {
     openFile,
     viewMode,
@@ -26,9 +27,8 @@ export function EditorPane() {
   // itself re-checks content against what's actually saved and is a no-op if nothing really
   // changed, so this can never produce an empty/no-op commit even if `dirty` is stale.
   useEffect(() => {
-    if (!openFile?.dirty || !settings?.githubToken || !settings.repo) return
+    if (!openFile?.dirty || !settings?.githubToken || !repo) return
     const token = settings.githubToken
-    const repo = settings.repo
     const timer = setTimeout(() => {
       void save(token, repo)
     }, autoSaveDelaySeconds * 1000)
@@ -38,7 +38,7 @@ export function EditorPane() {
     openFile?.dirty,
     openFile?.path,
     settings?.githubToken,
-    settings?.repo,
+    repo,
     autoSaveDelaySeconds,
     save,
   ])
@@ -91,10 +91,10 @@ export function EditorPane() {
           </div>
           <button
             className="rounded bg-purple-600 px-3 py-1 text-xs font-medium text-white hover:bg-purple-500 disabled:opacity-50"
-            disabled={!openFile.dirty || saving || !settings?.repo}
+            disabled={!openFile.dirty || saving || !repo}
             onClick={() => {
-              if (settings?.githubToken && settings.repo) {
-                void save(settings.githubToken, settings.repo)
+              if (settings?.githubToken && repo) {
+                void save(settings.githubToken, repo)
               }
             }}
           >
@@ -112,10 +112,10 @@ export function EditorPane() {
               onClick={() => {
                 if (
                   settings?.githubToken &&
-                  settings.repo &&
+                  repo &&
                   confirm('Reload from GitHub? This discards your unsaved changes to this file.')
                 ) {
-                  void openPath(settings.githubToken, settings.repo, openFile.path)
+                  void openPath(settings.githubToken, repo, openFile.path)
                 }
               }}
             >

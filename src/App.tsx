@@ -7,6 +7,7 @@ import { UnlockScreen } from './components/Vault/UnlockScreen'
 import { useEditorStore } from './store/editorStore'
 import { useThemeStore } from './store/themeStore'
 import { useVaultStore } from './store/vaultStore'
+import { getActiveRepo } from './types'
 
 function App() {
   const status = useVaultStore((s) => s.status)
@@ -35,8 +36,9 @@ function App() {
   }
 
   function handleSelectFile(path: string) {
-    if (!settings?.githubToken || !settings.repo) return
-    void openPath(settings.githubToken, settings.repo, path)
+    const repo = getActiveRepo(settings)
+    if (!settings?.githubToken || !repo) return
+    void openPath(settings.githubToken, repo, path)
   }
 
   return (
