@@ -1,27 +1,27 @@
 import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
-import type { EncryptedBlob } from '../types'
+import type { AppSettings } from '../types'
 
 /**
- * Mirrors the exact same encrypted blob that's in localStorage (see vaultStorage.ts) under
- * `vaults/{uid}`. Firestore only ever sees ciphertext — the passphrase that decrypts it never
- * leaves this browser, so this adds cross-device sync without weakening the zero-knowledge
- * design of the local vault.
+ * Mirrors this user's settings (GitHub token, workspaces, etc.) to Firestore under
+ * `settings/{uid}`. No client-side encryption on top: Firestore encrypts data at rest and
+ * `firestore.rules` restricts each doc to its own signed-in uid, which is the actual access
+ * control here, not a passphrase-derived key.
  */
-function vaultDocRef(uid: string) {
+function settingsDocRef(uid: string) {
   if (!db) throw new Error('Firebase is not configured')
-  return doc(db, 'vaults', uid)
+  return doc(db, 'settings', uid)
 }
 
-export async function fetchRemoteVault(uid: string): Promise<EncryptedBlob | null> {
-  const snap = await getDoc(vaultDocRef(uid))
-  return snap.exists() ? (snap.data() as EncryptedBlob) : null
+export async function fetchRemoteSettings(uid: string): Promise<AppSettings | null> {
+  const snap = await getDoc(settingsDocRef(uid))
+  return snap.exists() ? (snap.data() as AppSettings) : null
 }
 
-export async function pushRemoteVault(uid: string, blob: EncryptedBlob): Promise<void> {
-  await setDoc(vaultDocRef(uid), blob)
+export async function pushRemoteSettings(uid: string, settings: AppSettings): Promise<void> {
+  await setDoc(settingsDocRef(uid), settings)
 }
 
-export async function deleteRemoteVault(uid: string): Promise<void> {
-  await deleteDoc(vaultDocRef(uid))
+export async function deleteRemoteSettings(uid: string): Promise<void> {
+  await deleteDoc(settingsDocRef(uid))
 }

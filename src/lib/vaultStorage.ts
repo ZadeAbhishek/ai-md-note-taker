@@ -1,21 +1,25 @@
-import type { EncryptedBlob } from '../types'
+import type { AppSettings } from '../types'
 
-const STORAGE_KEY = 'md-note-taker.vault'
+// New key: the previous "md-note-taker.vault" held a passphrase-encrypted blob from before
+// client-side encryption was removed in favor of Firebase Auth + Firestore's own access
+// control and encryption-at-rest. That old key is simply left orphaned, not migrated — it
+// can no longer be decrypted without the passphrase prompt that used to ask for it.
+const STORAGE_KEY = 'vibe-md.settings'
 
-export function hasStoredVault(): boolean {
-  return localStorage.getItem(STORAGE_KEY) !== null
-}
-
-export function readVaultBlob(): EncryptedBlob | null {
+export function readLocalSettings(): AppSettings | null {
   const raw = localStorage.getItem(STORAGE_KEY)
   if (!raw) return null
-  return JSON.parse(raw) as EncryptedBlob
+  try {
+    return JSON.parse(raw) as AppSettings
+  } catch {
+    return null
+  }
 }
 
-export function writeVaultBlob(blob: EncryptedBlob): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+export function writeLocalSettings(settings: AppSettings): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
 }
 
-export function clearVault(): void {
+export function clearLocalSettings(): void {
   localStorage.removeItem(STORAGE_KEY)
 }

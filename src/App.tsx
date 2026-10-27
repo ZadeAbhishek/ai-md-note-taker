@@ -4,7 +4,6 @@ import { EditorPane } from './components/Editor/EditorPane'
 import { Sidebar } from './components/Sidebar/Sidebar'
 import { SettingsModal } from './components/Settings/SettingsModal'
 import { StatusBar } from './components/StatusBar'
-import { UnlockScreen } from './components/Vault/UnlockScreen'
 import { isFirebaseConfigured } from './lib/firebase'
 import { useAuthStore } from './store/authStore'
 import { useEditorStore } from './store/editorStore'
@@ -21,8 +20,7 @@ function App() {
   const status = useVaultStore((s) => s.status)
   const initVault = useVaultStore((s) => s.init)
   const settings = useVaultStore((s) => s.settings)
-  const lock = useVaultStore((s) => s.lock)
-  const logout = useVaultStore((s) => s.logout)
+  const resetSettings = useVaultStore((s) => s.reset)
   const openFile = useEditorStore((s) => s.openFile)
   const openPath = useEditorStore((s) => s.openPath)
   const theme = useThemeStore((s) => s.theme)
@@ -33,9 +31,9 @@ function App() {
     initAuth()
   }, [initAuth])
 
-  // Without Firebase configured, the vault behaves exactly as a local-only app (no auth gate).
-  // With it configured, the vault only loads once we know who's signed in — and re-loads
-  // (pulling that account's cloud copy) whenever the signed-in user changes.
+  // Without Firebase configured, settings load immediately (local-only, no auth gate). With
+  // it configured, they only load once we know who's signed in — and reload (pulling that
+  // account's cloud copy) whenever the signed-in user changes.
   useEffect(() => {
     if (!isFirebaseConfigured) {
       void initVault()
@@ -55,15 +53,11 @@ function App() {
     if (!authUser) return <SignInScreen />
   }
 
-  if (status === 'checking') return null
-
-  if (status !== 'unlocked') {
-    return <UnlockScreen />
-  }
+  if (status === 'loading') return null
 
   function handleSelectFile(path: string) {
     const repo = getActiveRepo(settings)
-    if (!settings?.githubToken || !repo) return
+    if (!settings.githubToken || !repo) return
     void openPath(settings.githubToken, repo, path)
   }
 
@@ -85,26 +79,20 @@ function App() {
             {theme === 'dark' ? '☀ Light' : '☾ Dark'}
           </button>
           <button
-            className="rounded px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-            onClick={lock}
-          >
-            Lock
-          </button>
-          <button
             className="rounded px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-200 hover:text-red-600 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-red-400"
             onClick={() => {
               if (
                 confirm(
                   isFirebaseConfigured
-                    ? 'Log out and erase the GitHub token and repo settings stored in this browser and in the cloud?'
-                    : 'Log out and erase the GitHub token and repo settings stored in this browser?',
+                    ? 'Erase your GitHub token and repo settings from this browser and the cloud? This cannot be undone.'
+                    : 'Erase your GitHub token and repo settings from this browser? This cannot be undone.',
                 )
               ) {
-                logout()
+                resetSettings()
               }
             }}
           >
-            Logout
+            Reset
           </button>
           {isFirebaseConfigured && authUser && (
             <button

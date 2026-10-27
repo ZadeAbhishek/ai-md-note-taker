@@ -27,28 +27,26 @@ export function getActiveRepo(settings: AppSettings | null): RepoRef | null {
   return settings.workspaces.find((w) => w.id === settings.activeWorkspaceId) ?? null
 }
 
-/**
- * Settings encrypted before multi-repo support only had a single `repo` field. Called once on
- * unlock so an existing local vault keeps working as a one-workspace setup instead of breaking.
- */
-export function migrateSettings(
-  raw: AppSettings & { repo?: RepoRef | null },
-): AppSettings {
-  if (raw.workspaces) return raw
-  const workspaces: Workspace[] = raw.repo ? [{ id: crypto.randomUUID(), ...raw.repo }] : []
+/** Fills in defaults for any fields missing from a settings object (old shape, fresh account, etc). */
+export function migrateSettings(raw: Partial<AppSettings> & { repo?: RepoRef | null }): AppSettings {
+  const workspaces = raw.workspaces ?? (raw.repo ? [{ id: crypto.randomUUID(), ...raw.repo }] : [])
   return {
-    githubToken: raw.githubToken,
+    githubToken: raw.githubToken ?? '',
     workspaces,
-    activeWorkspaceId: workspaces[0]?.id ?? null,
-    autoSaveDelaySeconds: raw.autoSaveDelaySeconds,
-    autoSyncIntervalSeconds: raw.autoSyncIntervalSeconds,
+    activeWorkspaceId: raw.activeWorkspaceId ?? workspaces[0]?.id ?? null,
+    autoSaveDelaySeconds: raw.autoSaveDelaySeconds ?? DEFAULT_AUTO_SAVE_DELAY_SECONDS,
+    autoSyncIntervalSeconds: raw.autoSyncIntervalSeconds ?? DEFAULT_AUTO_SYNC_INTERVAL_SECONDS,
   }
 }
 
-export interface EncryptedBlob {
-  salt: string
-  iv: string
-  ciphertext: string
+export function emptySettings(): AppSettings {
+  return {
+    githubToken: '',
+    workspaces: [],
+    activeWorkspaceId: null,
+    autoSaveDelaySeconds: DEFAULT_AUTO_SAVE_DELAY_SECONDS,
+    autoSyncIntervalSeconds: DEFAULT_AUTO_SYNC_INTERVAL_SECONDS,
+  }
 }
 
 export interface FileNode {

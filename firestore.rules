@@ -1,0 +1,14 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each user's settings (GitHub token, workspaces, etc. — see src/lib/vaultRemote.ts) live
+    // at settings/{uid}, as plain JSON: Firestore's own encryption-at-rest plus this rule
+    // (only that uid's own signed-in session may read or write it) are the access control,
+    // not a client-side passphrase. Firestore denies anything not explicitly matched, so
+    // nothing else is exposed.
+    match /settings/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

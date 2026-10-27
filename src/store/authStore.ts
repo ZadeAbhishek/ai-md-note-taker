@@ -67,9 +67,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   // Named signOutUser (not signOut) to avoid shadowing the imported firebase/auth signOut.
   signOutUser: async () => {
     if (!auth) return
-    // Re-lock the vault first so a shared/public browser can't be left showing an
-    // unlocked workspace after the account session ends.
-    useVaultStore.getState().lock()
+    // Clear this browser's local view first (not the cloud copy) so a shared/public
+    // browser can't be left showing the previous account's settings after sign-out.
+    useVaultStore.getState().clearSession()
     await firebaseSignOut(auth)
   },
 }))
