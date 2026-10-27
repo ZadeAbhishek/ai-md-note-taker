@@ -44,20 +44,47 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   status: 'loading',
   settings: emptySettings(),
 
+  // Hardened to always reach status: 'ready', no matter what fails along the way — this used
+  // to leave status pinned at 'loading' forever (a permanent blank screen with no way out,
+  // not even a refresh) if, say, writeLocalSettings() threw because storage was full or
+  // disabled. A stuck loading screen after signing in looks indistinguishable from "sign-in
+  // doesn't work" even though auth itself succeeded.
   init: async () => {
     set({ status: 'loading' })
     const uid = activeUid()
     let loaded: AppSettings | null = null
+
     if (uid) {
       try {
         loaded = await fetchRemoteSettings(uid)
-      } catch {
-        // Offline or not permitted yet — fall back to whatever's cached locally below.
+      } catch (err) {
+        // Falls back to whatever's cached locally below, but surface *why* — a silent
+        // swallow here is exactly how a Firestore rules/permission problem goes unnoticed
+        // until data looks like it vanished.
+        const message = err instanceof Error ? err.message : 'Could not reach Firestore'
+        useStatusStore.getState().setError(`Could not load cloud settings: ${message}`)
       }
     }
-    if (!loaded) loaded = readLocalSettings()
+
+    if (!loaded) {
+      try {
+        loaded = readLocalSettings()
+      } catch {
+        // readLocalSettings already guards internally; this is just extra defense.
+      }
+    }
+
     const resolved = migrateSettings(loaded ?? {})
-    writeLocalSettings(resolved)
+
+    try {
+      writeLocalSettings(resolved)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      useStatusStore
+        .getState()
+        .setError(`Could not save settings locally (storage may be full or disabled): ${message}`)
+    }
+
     set({ status: 'ready', settings: resolved })
   },
 
@@ -102,8 +129,11 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     await updateSettings({ ...settings, activeWorkspaceId: id })
   },
 
+  // Deliberately does NOT clear the local cache: cloud sync can fail silently (e.g. Firestore
+  // rules not matching), and wiping the only remaining copy on every sign-out turned that into
+  // guaranteed data loss — you'd have to re-enter your GitHub token on every sign-in. The local
+  // cache is only ever overwritten by a *successful* fetch in init(), never blindly discarded.
   clearSession: () => {
-    clearLocalSettings()
     useRepoStore.getState().reset()
     useEditorStore.getState().reset()
     set({ status: 'loading', settings: emptySettings() })

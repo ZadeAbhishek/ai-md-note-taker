@@ -36,6 +36,12 @@ export function SignInScreen() {
           Sign in to sync your workspaces across devices.
         </p>
 
+        {error && (
+          <div className="mb-4 rounded border-2 border-red-500 bg-red-50 p-3 text-sm font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
         <button
           className="w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-900 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700"
           onClick={() => void signInWithGoogle()}
@@ -72,8 +78,6 @@ export function SignInScreen() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-
-          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <button
             type="submit"
