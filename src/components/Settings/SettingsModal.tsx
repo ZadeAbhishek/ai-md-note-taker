@@ -121,7 +121,12 @@ export function SettingsModal({ onClose }: Props) {
                             ? 'font-medium text-purple-600 dark:text-purple-400'
                             : 'text-neutral-700 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100'
                         }`}
-                        onClick={() => void setActiveWorkspace(w.id)}
+                        onClick={() => {
+                          setError(null)
+                          setActiveWorkspace(w.id).catch((err) =>
+                            setError(err instanceof Error ? err.message : 'Failed to switch workspace'),
+                          )
+                        }}
                       >
                         {isActive ? '● ' : ''}
                         {w.owner}/{w.name}{' '}
@@ -136,7 +141,10 @@ export function SettingsModal({ onClose }: Props) {
                               `Remove ${w.owner}/${w.name} from your workspaces? This only removes it from this app, not from GitHub.`,
                             )
                           ) {
-                            void removeWorkspace(w.id)
+                            setError(null)
+                            removeWorkspace(w.id).catch((err) =>
+                              setError(err instanceof Error ? err.message : 'Failed to remove workspace'),
+                            )
                           }
                         }}
                       >
@@ -213,7 +221,11 @@ export function SettingsModal({ onClose }: Props) {
           </p>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && (
+          <div className="mt-3 rounded border-2 border-red-500 bg-red-50 p-2 text-sm font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+            {error}
+          </div>
+        )}
 
         <div className="mt-5 flex justify-end gap-2">
           <button

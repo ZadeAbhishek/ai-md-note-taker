@@ -14,16 +14,25 @@ function activeUid(): string | null {
   return useAuthStore.getState().user?.uid ?? null
 }
 
-/** Fire-and-forget push to Firestore — never blocks or fails the local save. */
-function syncToCloud(settings: AppSettings) {
+/**
+ * Pushes to Firestore and reports to the status bar either way. Returns the error message on
+ * failure (instead of swallowing it) so callers like updateSettings() can also surface it
+ * somewhere the user is actually already looking — the status bar toast alone auto-dismisses
+ * in a few seconds and was easy to miss, which is how a cloud sync could keep failing
+ * silently across multiple saves without ever being noticed.
+ */
+async function syncToCloud(settings: AppSettings): Promise<string | null> {
   const uid = activeUid()
-  if (!uid) return
-  pushRemoteSettings(uid, settings)
-    .then(() => useStatusStore.getState().setSuccess('Synced settings to cloud'))
-    .catch((err) => {
-      const message = err instanceof Error ? err.message : 'Cloud sync failed'
-      useStatusStore.getState().setError(`Cloud sync failed: ${message}`)
-    })
+  if (!uid) return null
+  try {
+    await pushRemoteSettings(uid, settings)
+    useStatusStore.getState().setSuccess('Synced settings to cloud')
+    return null
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Cloud sync failed'
+    useStatusStore.getState().setError(`Cloud sync failed: ${message}`)
+    return message
+  }
 }
 
 interface VaultState {
@@ -90,8 +99,12 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   updateSettings: async (settings) => {
     writeLocalSettings(settings)
-    syncToCloud(settings)
     set({ settings })
+    // Local save already succeeded and is reflected above either way — but still throw on a
+    // cloud failure so it reaches whichever UI called this (e.g. SettingsModal's own inline
+    // error), not just the auto-dismissing status bar toast.
+    const cloudError = await syncToCloud(settings)
+    if (cloudError) throw new Error(`Saved locally, but cloud sync failed: ${cloudError}`)
   },
 
   addWorkspace: async (repo) => {
